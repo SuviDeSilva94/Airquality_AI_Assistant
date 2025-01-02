@@ -10,8 +10,8 @@ from flask import Flask, request, jsonify
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # ----- API Configuration -----
-API_KEY = ""  # OpenWeatherMap API key
-GEMINI_API_KEY = ""  # Gemini API key from Google AI Studio
+API_KEY = "628c8e8ef73a64fc4cccfe1be336c4b9"  # OpenWeatherMap API key
+GEMINI_API_KEY = "AIzaSyCQLHYeSBLR_Xr6WRDYtvV6_Geqay3PiSA"  # Gemini API key from Google AI Studio
 BASE_URL = "http://api.openweathermap.org/data/2.5/air_pollution"
 GEO_URL = "http://api.openweathermap.org/geo/1.0/direct"
 

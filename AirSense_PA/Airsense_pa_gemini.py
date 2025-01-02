@@ -4,26 +4,33 @@ import google.generativeai as genai
 import logging
 import re
 from datetime import datetime
+from flask import Flask, request, jsonify
 
 # ----- Logging Setup -----
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # ----- API Configuration -----
-API_KEY = ""  # OpenWeatherMap API key
-GEMINI_API_KEY = ""  # Gemini API key from Google AI Studio
+API_KEY = "628c8e8ef73a64fc4cccfe1be336c4b9"  # OpenWeatherMap API key
+GEMINI_API_KEY = "AIzaSyCQLHYeSBLR_Xr6WRDYtvV6_Geqay3PiSA"  # Gemini API key from Google AI Studio
 BASE_URL = "http://api.openweathermap.org/data/2.5/air_pollution"
 GEO_URL = "http://api.openweathermap.org/geo/1.0/direct"
 
 # ----- Default Location Configuration -----
 DEFAULT_LATITUDE = 59.3293  # Latitude for Stockholm, Sweden
 DEFAULT_LONGITUDE = 18.0686  # Longitude for Stockholm, Sweden
-current_latitude = DEFAULT_LATITUDE
-current_longitude = DEFAULT_LONGITUDE
-current_city_name = "Stockholm" # Initial default city name
+
 
 # ----- Gemini Setup -----
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel('gemini-pro')
+
+# ----- Flask App Setup -----
+app = Flask(__name__)
+# --- Initial Default Values ---
+current_latitude = DEFAULT_LATITUDE
+current_longitude = DEFAULT_LONGITUDE
+current_city_name = "Stockholm"
+
 
 # ----- Geocoding function -----
 def get_coordinates(city_name):
@@ -74,8 +81,6 @@ def get_air_quality_data(lat, lon):
     except requests.exceptions.RequestException as e:
        logging.error(f"Error fetching air quality data: {e}")
        return None
-
-
 
 # ----- Data Processing Function -----
 def process_api_data(data):
@@ -143,11 +148,8 @@ def format_api_response(data):
         formatted_string += f"  O3: {components.get('o3')} μg/m³\n" if components.get('o3') else "  O3: Not Available\n"
         formatted_string += f"  SO2: {components.get('so2')} μg/m³\n" if components.get('so2') else "  SO2: Not Available\n"
         formatted_string += f"  NH3: {components.get('nh3')} μg/m³\n" if components.get('nh3') else "  NH3: Not Available\n"
-
-
         formatted_string += f"Timestamp: {air_data.get('dt')}\n"
     return formatted_string
-
 
 
 # ----- Gemini Interaction -----
@@ -161,7 +163,6 @@ def get_gemini_response(query, formatted_data, city_name, detail_level):
            city_name (str): The name of the city
            detail_level (str): How much information should be provided, such as "full" or "concise"
 
-
         Returns:
            str: The response from Gemini
     """
@@ -174,13 +175,10 @@ def get_gemini_response(query, formatted_data, city_name, detail_level):
         """
     if detail_level == "concise":
         prompt += f"""
-        Based on the current air quality data for {city_name},
-        Provide a short summary with the Air Quality Index (AQI), and whether it is considered good or bad air quality, also include PM2.5 and PM10 values and say whether or not it is safe to be outside.
-        Do not include any other values.
+        Based on the current air quality data for {city_name}, provide a short summary with the Air Quality Index (AQI), and whether it is considered good or bad air quality, also include PM2.5 and PM10 values and say whether or not it is safe to be outside. Do not include any other values
         Here is the full air quality data:
         {formatted_data}
-        """
-
+       """
     elif detail_level == "full":
        prompt += f"""Here is the full air quality data including coordinates, all available pollutants and a timestamp:
         {formatted_data}
@@ -194,7 +192,6 @@ def get_gemini_response(query, formatted_data, city_name, detail_level):
         Provide information about what the air quality values mean and how they might affect them.
         If the query is not relevant to air quality, please say "I can help you with air quality related questions".
        """
-
     prompt += f" Answer the user query: '{query}'."
 
 
@@ -215,7 +212,6 @@ def display_air_quality_data(data, city_name, detail_level="concise"):
            data (dict): A dictionary of all air quality data.
            city_name (str): City name
            detail_level (str): How much information should be provided, such as "full" or "concise"
-
 
        Returns:
            None
@@ -248,87 +244,51 @@ def display_air_quality_data(data, city_name, detail_level="concise"):
              print(f"  - {pollutant}")
 
 
-
-# ----- Main Program Logic -----
-def main():
+@app.route('/', methods=['GET', 'POST'])
+def air_quality_api():
     """
-       Main entry point of the program. Gets user input and provides the response
+       Main function to return air quality data to a user using a Flask API
     """
     global current_latitude, current_longitude, current_city_name
 
-    # --- Initial Greeting ---
-    print("Hi this is Air Sense AI, How can I help you regarding air quality?")
+    if request.method == 'GET':
+        user_query = request.args.get('query', '').lower()
+    elif request.method == 'POST':
+        data = request.get_json()
+        user_query = data.get('query', '').lower()
+    else:
+        return jsonify({"error": "Method not allowed"}), 405
 
-    # --- Get User Location at Start ---
-    location = input("Where are you today? (or type 'default' to use default location): ")
-    if location.lower() != 'default':
-        coordinates = get_coordinates(location)
+
+    # Explicit Location Change
+    location_match = re.search(r"change the location to ([\w\s]+(?:,\s*\w+)?)", user_query, re.IGNORECASE)
+    if location_match:
+        city_name = location_match.group(1).strip()
+        print(f"main(): identified city for location change request: {city_name}")  # Debug message
+        coordinates = get_coordinates(city_name)
         if coordinates:
             current_latitude, current_longitude = coordinates
-            current_city_name = location # Update the city name here
-            print(f"Location set to: {location}")
+            current_city_name = city_name
+            print(f"main(): Updated location: current_city_name: {current_city_name}, current_latitude: {current_latitude}, current_longitude: {current_longitude}") # Debug message
+            return jsonify({"status": "Location updated to " + current_city_name})
         else:
-            print("Invalid location, using default location")
+            return jsonify({"error": f"Could not determine coordinates for city {city_name}. Using previous location."}), 400
+
+    air_quality_data = get_air_quality_data(current_latitude, current_longitude)
+    if air_quality_data:
+      formatted_data = format_api_response(air_quality_data)
+      if "details" in user_query or "pollutants" in user_query:
+        display_air_quality_data(air_quality_data, current_city_name, "full")
+        response = get_gemini_response(user_query, formatted_data, current_city_name, "full")
+      else:
+        display_air_quality_data(air_quality_data, current_city_name, "concise")
+        response = get_gemini_response(user_query, formatted_data, current_city_name, "concise")
+
+      return jsonify({"response": response})
     else:
-        print(f"Using default location")
-
-
-    while True:
-        user_query = input("Ask me anything (or type 'exit' to quit): ")
-        if user_query.lower() == 'exit':
-            break
-
-        # Explicit Location Change
-        location_match = re.search(r"change the location to ([\w\s]+(?:,\s*\w+)?)", user_query, re.IGNORECASE)
-        if location_match:
-            city_name = location_match.group(1).strip()
-            print(f"main(): identified city for location change request: {city_name}")  # Debug message
-            coordinates = get_coordinates(city_name)
-            if coordinates:
-                current_latitude, current_longitude = coordinates
-                current_city_name = city_name
-                print(f"main(): Updated location: current_city_name: {current_city_name}, current_latitude: {current_latitude}, current_longitude: {current_longitude}") # Debug message
-                continue
-            else:
-                print(f"Could not determine coordinates for city {city_name}. Using previous location.")
-                continue
-
-        air_quality_data = get_air_quality_data(current_latitude, current_longitude)
-
-
-        if air_quality_data:
-            formatted_data = format_api_response(air_quality_data)
-            if "details" in user_query.lower() or "pollutants" in user_query.lower():
-              display_air_quality_data(air_quality_data, current_city_name, "full")
-              response = get_gemini_response(user_query, formatted_data, current_city_name, "full")
-            else:
-              display_air_quality_data(air_quality_data, current_city_name, "concise")
-              response = get_gemini_response(user_query, formatted_data, current_city_name, "concise")
-
-            print(response)
+       return jsonify({"error": "Could not get air quality data"}), 500
 
 
 # ----- Entry Point Execution -----
 if __name__ == "__main__":
-    main()
-
-
-# Hi This is Air Sense Ai, What do you need to know about Air Quality?
-
-# Default is set to Stockholm, Do i need to change your location? If yes,
-
-# Where are you today?
-
-# "What is the air quality?" - The system will use the default or previous location, with a concise prompt and no extra output
-
-# "can i walk today", "Can i go jogging", "cycling" or any activity involves outside need to answer how the air qualit index and pm values
-
-# "change the location to London" - The location is updated. the system returns to the prompt.
-
-# "What is the air quality today?" - The system will now respond with data from London, with a concise prompt and no extra output.
-
-# "change the location to Tokyo, Japan" - The location is updated. the system returns to the prompt.
-
-# "What are the details of the air quality?" - The system will now output a detailed report about Tokyo, Japan.
-
-# Details - give all the api response details
+    app.run(debug=True)

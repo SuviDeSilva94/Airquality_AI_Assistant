@@ -5,13 +5,14 @@ import logging
 import re
 from datetime import datetime
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # Import CORS
 
 # ----- Logging Setup -----
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # ----- API Configuration -----
-API_KEY = "628c8e8ef73a64fc4cccfe1be336c4b9"  # OpenWeatherMap API key
-GEMINI_API_KEY = "AIzaSyCQLHYeSBLR_Xr6WRDYtvV6_Geqay3PiSA"  # Gemini API key from Google AI Studio
+API_KEY = ""  # OpenWeatherMap API key
+GEMINI_API_KEY = ""  # Gemini API key from Google AI Studio
 BASE_URL = "http://api.openweathermap.org/data/2.5/air_pollution"
 GEO_URL = "http://api.openweathermap.org/geo/1.0/direct"
 
@@ -26,6 +27,8 @@ gemini_model = genai.GenerativeModel('gemini-pro')
 
 # ----- Flask App Setup -----
 app = Flask(__name__)
+CORS(app) # Enable CORS for all routes with a single line of code!
+
 # --- Initial Default Values ---
 current_latitude = DEFAULT_LATITUDE
 current_longitude = DEFAULT_LONGITUDE

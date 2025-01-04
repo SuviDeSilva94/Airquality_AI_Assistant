@@ -246,6 +246,54 @@ def display_air_quality_data(data, city_name, detail_level="concise"):
           for pollutant in other_pollutants:
              print(f"  - {pollutant}")
 
+# ---- New API Endpoint ------
+@app.route('/pmvalues', methods=['GET'])
+def pm_values_api():
+    """
+    Returns only PM2.5 and PM10 values as a JSON response.
+    """
+    global current_latitude, current_longitude
+    air_quality_data = get_air_quality_data(current_latitude, current_longitude)
+    if air_quality_data and air_quality_data['list']:
+        try:
+            air_data = air_quality_data['list'][0]
+            components = air_data.get('components', {})
+            pm25 = components.get('pm2_5')
+            pm10 = components.get('pm10')
+            if pm25 is not None and pm10 is not None:
+              return jsonify({"pm25": pm25, "pm10": pm10}), 200
+            else:
+               return jsonify({"error": "PM2.5 or PM10 values not available"}), 400
+        except Exception as e:
+           logging.error(f"pm_values_api(): An error has occured: {e}")
+           return jsonify({"error": "Could not process air quality data"}), 500
+    else:
+        return jsonify({"error": "Could not get air quality data"}), 500
+
+# ---- New API Endpoint ------
+@app.route('/pmairquality', methods=['GET'])
+def pm_air_quality_api():
+    """
+    Returns only PM2.5 and PM10 values as a text response.
+    """
+    global current_latitude, current_longitude
+    air_quality_data = get_air_quality_data(current_latitude, current_longitude)
+    if air_quality_data and air_quality_data['list']:
+        try:
+           air_data = air_quality_data['list'][0]
+           components = air_data.get('components', {})
+           pm25 = components.get('pm2_5')
+           pm10 = components.get('pm10')
+           if pm25 is not None and pm10 is not None:
+              return jsonify({"pm25": f"{pm25}", "pm10": f"{pm10}"}), 200
+           else:
+             return jsonify({"error": "PM2.5 or PM10 values not available"}), 400
+        except Exception as e:
+          logging.error(f"pm_values_api(): An error has occured: {e}")
+          return jsonify({"error": "Could not process air quality data"}), 500
+    else:
+        return jsonify({"error": "Could not get air quality data"}), 500
+
 
 @app.route('/', methods=['GET', 'POST'])
 def air_quality_api():
@@ -261,7 +309,6 @@ def air_quality_api():
         user_query = data.get('query', '').lower()
     else:
         return jsonify({"error": "Method not allowed"}), 405
-
 
     # Explicit Location Change
     location_match = re.search(r"change the location to ([\w\s]+(?:,\s*\w+)?)", user_query, re.IGNORECASE)

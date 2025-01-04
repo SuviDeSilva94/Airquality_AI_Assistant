@@ -247,10 +247,10 @@ def display_air_quality_data(data, city_name, detail_level="concise"):
              print(f"  - {pollutant}")
 
 # ---- New API Endpoint ------
-@app.route('/pmvalues', methods=['GET'])
-def pm_values_api():
+@app.route('/aqipollutants', methods=['GET'])
+def aqi_pollutants_api():
     """
-    Returns only PM2.5 and PM10 values as a JSON response.
+    Returns AQI, other pollutants, PM values, and an air quality status as text values in a JSON response.
     """
     global current_latitude, current_longitude
     air_quality_data = get_air_quality_data(current_latitude, current_longitude)
@@ -258,15 +258,51 @@ def pm_values_api():
         try:
             air_data = air_quality_data['list'][0]
             components = air_data.get('components', {})
+            aqi = air_data.get('main', {}).get('aqi')
             pm25 = components.get('pm2_5')
             pm10 = components.get('pm10')
-            if pm25 is not None and pm10 is not None:
-              return jsonify({"pm25": pm25, "pm10": pm10}), 200
+            co = components.get('co')
+            no = components.get('no')
+            no2 = components.get('no2')
+            o3 = components.get('o3')
+            so2 = components.get('so2')
+            nh3 = components.get('nh3')
+
+            aqi_status = "Not Available"
+            if aqi is not None:
+                 if aqi <= 1:
+                    aqi_status = "Good"
+                 elif aqi <= 2:
+                   aqi_status = "Moderate"
+                 elif aqi <= 3:
+                    aqi_status = "Unhealthy for sensitive groups"
+                 elif aqi <= 4:
+                    aqi_status = "Unhealthy"
+                 elif aqi <= 5:
+                     aqi_status = "Very Unhealthy"
+                 elif aqi > 5:
+                    aqi_status = "Hazardous"
+
+
+            if aqi is not None:
+               return jsonify({
+                   "aqi": f"{aqi}",
+                    "pm25": f"{pm25}" if pm25 is not None else "Not Available",
+                   "pm10": f"{pm10}" if pm10 is not None else "Not Available",
+                    "co": f"{co}" if co is not None else "Not Available",
+                    "no": f"{no}" if no is not None else "Not Available",
+                    "no2": f"{no2}" if no2 is not None else "Not Available",
+                    "o3": f"{o3}" if o3 is not None else "Not Available",
+                    "so2": f"{so2}" if so2 is not None else "Not Available",
+                    "nh3": f"{nh3}" if nh3 is not None else "Not Available",
+                   "aqi_status": f"{aqi_status}",
+                    }), 200
             else:
-               return jsonify({"error": "PM2.5 or PM10 values not available"}), 400
+               return jsonify({"error": "AQI value not available"}), 400
         except Exception as e:
-           logging.error(f"pm_values_api(): An error has occured: {e}")
-           return jsonify({"error": "Could not process air quality data"}), 500
+            logging.error(f"aqi_pollutants_api(): An error has occurred: {e}")
+            return jsonify({"error": "Could not process air quality data"}), 500
+
     else:
         return jsonify({"error": "Could not get air quality data"}), 500
 

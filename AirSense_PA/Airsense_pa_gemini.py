@@ -325,21 +325,21 @@ def aqi_pollutants_api():
             so2 = components.get('so2')
             nh3 = components.get('nh3')
 
-            aqi_status = "Not Available"
-            if aqi is not None:
-                 if aqi <= 1:
-                    aqi_status = "Good"
-                 elif aqi <= 2:
-                   aqi_status = "Moderate"
-                 elif aqi <= 3:
-                    aqi_status = "Unhealthy for sensitive groups"
-                 elif aqi <= 4:
-                    aqi_status = "Unhealthy"
-                 elif aqi <= 5:
-                     aqi_status = "Very Unhealthy"
-                 elif aqi > 5:
-                    aqi_status = "Hazardous"
+            aqi_status = "Not Available"  # Default value when AQI is not available
 
+            if aqi is not None:
+                if aqi <= 50:
+                    aqi_status = "Good"
+                elif aqi <= 100:
+                    aqi_status = "Moderate"
+                elif aqi <= 150:
+                    aqi_status = "Unhealthy for Sensitive Groups"
+                elif aqi <= 200:
+                    aqi_status = "Unhealthy"
+                elif aqi <= 300:
+                    aqi_status = "Very Unhealthy"
+                elif aqi > 300:
+                    aqi_status = "Hazardous"
 
             if aqi is not None:
                return jsonify({

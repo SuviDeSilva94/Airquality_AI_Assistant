@@ -246,6 +246,63 @@ def display_air_quality_data(data, city_name, detail_level="concise"):
           for pollutant in other_pollutants:
              print(f"  - {pollutant}")
 
+# ----- IOT api Request function -----
+def get_iot_data():
+    """
+      Fetches air quality data from the IOT device, calculates AQI, and returns it with status.
+
+      Returns:
+          dict or None: Air quality data with calculated AQI and status, or None if an error occurs.
+    """
+    try:
+        response = requests.get(IOT_API_URL)
+        response.raise_for_status()
+        data = response.json()
+        if data:
+            print (f"get_iot_data(): Successfully retrieved IoT data: {data}")
+            pm25 = data.get("pm2_5")
+            pm10 = data.get("pm10")
+            if pm25 is not None and pm10 is not None:
+                aqi, status = calculate_aqi_and_status(pm25, pm10)
+                print(f"get_iot_data(): Successfully calculated aqi: {aqi} and status: {status}")
+                return {"pm2_5": pm25, "pm10": pm10, "aqi": aqi, "status": status}
+            else:
+                 logging.error(f"get_iot_data(): No pm2_5 or pm10 values in IoT data")
+                 return None
+        else:
+           logging.error(f"get_iot_data(): No IoT data available ")
+           return None
+    except requests.exceptions.RequestException as e:
+      logging.error(f"get_iot_data(): Error fetching IOT data: {e}")
+      return None
+    
+def calculate_aqi_and_status(pm25, pm10):
+    """
+      Calculates AQI and determines the status.
+
+        Parameters:
+            pm25 (float): PM2.5 value.
+            pm10 (float): PM10 value.
+
+        Returns:
+            tuple: A tuple containing the (aqi, status).
+    """
+    # Simplified AQI calculation for demonstration purposes
+    # You might want to implement different calculations based on the location you are using.
+    aqi =  (pm25 + pm10) # Simple example
+    status = "Good"
+    if aqi > 50 :
+        status = "Moderate"
+    if aqi > 100 :
+        status = "Unhealthy"
+    if aqi > 150 :
+        status = "Harmful"
+    if aqi > 200:
+       status = "Hazardous"
+
+    return aqi, status
+
+
 # ---- New API Endpoint ------
 @app.route('/aqipollutants', methods=['GET'])
 def aqi_pollutants_api():
@@ -329,6 +386,26 @@ def pm_air_quality_api():
           return jsonify({"error": "Could not process air quality data"}), 500
     else:
         return jsonify({"error": "Could not get air quality data"}), 500
+    
+# ----- New API Endpoint to get pm values and status ------
+@app.route('/aqipollutantsiot', methods=['GET'])
+def aqi_pollutants_api():
+    """
+    Returns AQI, other pollutants, PM values, and an air quality status as text values in a JSON response.
+    """
+    iot_data = get_iot_data()  #Get data from IOT API
+
+    if iot_data is not None:
+
+       return jsonify({
+                   "aqi": f"{iot_data.get('aqi')}",
+                    "pm25": f"{iot_data.get('pm2_5')}" if iot_data.get('pm2_5') is not None else "Not Available",
+                   "pm10": f"{iot_data.get('pm10')}" if iot_data.get('pm10') is not None else "Not Available",
+                  "aqi_status": f"{iot_data.get('status')}",
+                    }), 200
+    else:
+      return jsonify({"error": "Could not get data from IoT device"}), 500
+
 
 
 @app.route('/', methods=['GET', 'POST'])
